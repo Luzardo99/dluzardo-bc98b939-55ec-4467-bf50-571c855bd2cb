@@ -5,6 +5,7 @@ import { User, Organization, Task, AuditLog } from '@dluzardo-bc98b939-55ec-4467
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { SeedController } from './seed.controller';
 
 @Module({
   imports: [
@@ -16,11 +17,12 @@ import { AppService } from './app.service';
       type: 'sqlite',
       database: 'data/task-management.db',
       entities: [User, Organization, Task, AuditLog],
-      synchronize: true, // Only for development!
+      synchronize: true,
       logging: ['error', 'warn'],
     }),
+    TypeOrmModule.forFeature([User, Organization, Task, AuditLog]),
   ],
-  controllers: [AppController],
+  controllers: [AppController, SeedController],
   providers: [AppService],
 })
 export class AppModule {}
