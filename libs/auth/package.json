@@ -1,0 +1,11 @@
+{
+  "name": "@dluzardo-bc98b939-55ec-4467-bf50-571c855bd2cb/auth",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "dependencies": {
+    "tslib": "^2.3.0"
+  }
+}
