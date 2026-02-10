@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { User, Organization, Task, AuditLog } from '@dluzardo-bc98b939-55ec-4467-bf50-571c855bd2cb/data';
@@ -6,9 +7,12 @@ import { User, Organization, Task, AuditLog } from '@dluzardo-bc98b939-55ec-4467
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SeedController } from './seed.controller';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
+    AuthModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: 'apps/api/.env',
@@ -23,6 +27,9 @@ import { SeedController } from './seed.controller';
     TypeOrmModule.forFeature([User, Organization, Task, AuditLog]),
   ],
   controllers: [AppController, SeedController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}

@@ -1,4 +1,5 @@
 import { Controller, Post } from '@nestjs/common';
+import { Public } from './auth/public.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -25,6 +26,7 @@ export class SeedController {
     private auditLogRepo: Repository<AuditLog>,
   ) {}
 
+  @Public()
   @Post()
   async seed() {
     // Clear in FK order: audit_logs → tasks → users → orgs (TypeORM rejects delete({}) for safety)
