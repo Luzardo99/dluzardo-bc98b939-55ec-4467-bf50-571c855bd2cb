@@ -10,6 +10,7 @@ import {
   User,
   UserRole,
   Organization,
+  AuditAction,
 } from '@dluzardo-bc98b939-55ec-4467-bf50-571c855bd2cb/data';
 import type {
   CreateTaskDto,
@@ -19,6 +20,7 @@ import {
   getAccessibleOrgIds,
   type OrgWithChildren,
 } from '@dluzardo-bc98b939-55ec-4467-bf50-571c855bd2cb/auth';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class TasksService {
@@ -27,6 +29,7 @@ export class TasksService {
     private taskRepo: Repository<Task>,
     @InjectRepository(Organization)
     private orgRepo: Repository<Organization>,
+    private auditService: AuditService,
   ) {}
 
   private async getAccessibleOrgIdsForUser(user: User): Promise<string[]> {
@@ -78,11 +81,20 @@ export class TasksService {
     if (user.role === UserRole.VIEWER) {
       throw new ForbiddenException('Viewers cannot create tasks');
     }
-    return this.taskRepo.save({
+    const task = await this.taskRepo.save({
       ...dto,
       ownerId: user.id,
       organizationId: user.organizationId,
     });
+    await this.auditService.log({
+      userId: user.id,
+      action: AuditAction.CREATE,
+      resourceType: 'task',
+      resourceId: task.id,
+      organizationId: task.organizationId,
+      metadata: { title: task.title },
+    });
+    return task;
   }
 
   async update(id: string, dto: UpdateTaskDto, user: User) {
@@ -91,6 +103,14 @@ export class TasksService {
       throw new ForbiddenException('Viewers cannot edit tasks');
     }
     await this.taskRepo.update(id, dto);
+    await this.auditService.log({
+      userId: user.id,
+      action: AuditAction.UPDATE,
+      resourceType: 'task',
+      resourceId: id,
+      organizationId: task.organizationId,
+      metadata: dto.title ? { title: dto.title } : undefined,
+    });
     return this.taskRepo.findOne({ where: { id }, relations: ['owner', 'organization'] });
   }
 
@@ -99,6 +119,14 @@ export class TasksService {
     if (user.role === UserRole.VIEWER) {
       throw new ForbiddenException('Viewers cannot delete tasks');
     }
+    await this.auditService.log({
+      userId: user.id,
+      action: AuditAction.DELETE,
+      resourceType: 'task',
+      resourceId: id,
+      organizationId: task.organizationId,
+      metadata: { title: task.title },
+    });
     await this.taskRepo.delete(id);
     return { deleted: true };
   }

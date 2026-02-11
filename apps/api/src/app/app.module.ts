@@ -9,12 +9,14 @@ import { AppService } from './app.service';
 import { SeedController } from './seed.controller';
 import { AuthModule } from './auth/auth.module';
 import { TasksModule } from './tasks/tasks.module';
+import { AuditModule } from './audit/audit.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
     AuthModule,
     TasksModule,
+    AuditModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: 'apps/api/.env',
