@@ -11,6 +11,7 @@ A full-stack task management application built with an Nx monorepo, featuring JW
 - [Data Model](#data-model)
 - [API Reference](#api-reference)
 - [Access Control](#access-control)
+- [Tests](#tests)
 - [Future Considerations](#future-considerations)
 
 ---
@@ -208,7 +209,6 @@ All task endpoints are scoped by the user’s organization(s). Owners at a paren
 ## Future Considerations
 
 - **Refresh tokens** – Long-lived refresh token flow for better security and UX.
-- **Tests** – Unit/integration tests for auth, RBAC, and services; e2e for critical flows.
 - **Audit UI** – Dedicated page for audit logs in the dashboard.
 - **Task ordering** – Persisted `sortOrder` for drag-and-drop reordering.
 - **Backend filters** – Pass status/category/sort query params to the API instead of filtering in the frontend.
@@ -225,6 +225,6 @@ npx nx run-many -t build
 # Lint
 npx nx run-many -t lint
 
-# Run tests
-npx nx run-many -t test
+# Run all unit tests
+npx nx run-many -t test --projects=api,auth,dashboard
 ```
