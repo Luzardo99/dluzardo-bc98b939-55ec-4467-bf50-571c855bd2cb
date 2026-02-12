@@ -1,101 +1,230 @@
-# DluzardoBc98b93955ec4467Bf50571c855bd2cb
+# Secure Task Management System
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+A full-stack task management application built with an Nx monorepo, featuring JWT authentication, role-based access control (RBAC), organization-scoped data, and audit logging.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+## Table of Contents
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/tutorials/angular-monorepo-tutorial?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Setup](#setup)
+- [Running the Application](#running-the-application)
+- [Data Model](#data-model)
+- [API Reference](#api-reference)
+- [Access Control](#access-control)
+- [Future Considerations](#future-considerations)
 
-## Run tasks
+---
 
-To run the dev server for your app, use:
+## Architecture
 
-```sh
+The project is structured as an **Nx monorepo** with shared libraries and two applications:
+
+```
+├── apps/
+│   ├── api/              # NestJS REST API (backend)
+│   ├── api-e2e/          # End-to-end API tests
+│   └── dashboard/        # Angular SPA (frontend)
+├── libs/
+│   ├── auth/             # RBAC decorators, guards, org-scope helpers
+│   └── data/             # Shared entities, DTOs, enums
+```
+
+**Backend (API)**  
+NestJS with TypeORM and SQLite. Handles authentication (JWT), RBAC, task CRUD, and audit logging. All protected routes require a valid JWT; create/update/delete operations additionally enforce role checks (Owner/Admin only).
+
+**Frontend (Dashboard)**  
+Angular 21 SPA with TailwindCSS. Login flow, JWT storage, and HTTP interceptor for auth. Kanban board with drag-and-drop status changes, filtering, sorting, completion chart, and dark/light mode.
+
+**Shared Libraries**  
+- `@dluzardo-bc98b939-55ec-4467-bf50-571c855bd2cb/data`: TypeORM entities (User, Organization, Task, AuditLog), DTOs, enums.  
+- `@dluzardo-bc98b939-55ec-4467-bf50-571c855bd2cb/auth`: `@Roles()` decorator, `RolesGuard`, `getAccessibleOrgIds()` for organization hierarchy.
+
+---
+
+## Tech Stack
+
+| Layer    | Technologies                                                |
+| -------- | ----------------------------------------------------------- |
+| Monorepo | Nx 22                                                       |
+| Backend  | NestJS 11, TypeORM, SQLite, Passport JWT, bcrypt            |
+| Frontend | Angular 21, TailwindCSS 3, Angular CDK (drag-drop)          |
+| Auth     | JWT (RS256/symmetric), HTTP-only-style storage in frontend  |
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Node.js 18+  
+- npm 9+
+
+### Installation
+
+```bash
+# Clone and install dependencies
+npm install
+```
+
+### Environment Configuration
+
+Copy the example env file and set values:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+```
+
+Edit `apps/api/.env`:
+
+```
+JWT_SECRET=your-jwt-secret-here-minimum-32-characters
+JWT_EXPIRATION=24h
+PORT=3000
+NODE_ENV=development
+```
+
+---
+
+## Running the Application
+
+### 1. Seed the database (optional but recommended)
+
+Seed creates organizations, users, and sample tasks:
+
+```bash
+curl -X POST http://localhost:3000/api/seed
+```
+
+Or run after the API is up (see step 2).
+
+### 2. Start the API
+
+```bash
+npx nx serve api
+```
+
+API runs at `http://localhost:3000`.
+
+### 3. Start the dashboard
+
+```bash
 npx nx serve dashboard
 ```
 
-To create a production bundle:
+Dashboard runs at `http://localhost:4200`. The dev server proxies `/api` to the API.
 
-```sh
-npx nx build dashboard
+### Demo credentials (after seed)
+
+| Email               | Password   | Role   |
+| ------------------- | ---------- | ------ |
+| owner@acme.com      | password123| Owner  |
+| admin@acme.com      | password123| Admin  |
+| admin.eng@acme.com  | password123| Admin  |
+| viewer.eng@acme.com | password123| Viewer |
+
+---
+
+## Data Model
+
+### Entity Relationship Diagram (Conceptual)
+
+```
+Organization (1) ──< (N) User
+Organization (1) ──< (N) Task
+Organization (1) ──< (N) AuditLog
+
+User (1) ──< (N) Task  (owner)
 ```
 
-To see all available targets to run for a project, run:
+- **Organization**: Hierarchical (`parentId`). Acme Corp → Engineering, Marketing.
+- **User**: `email`, `passwordHash`, `role` (owner/admin/viewer), `organizationId`.
+- **Task**: `title`, `description`, `status` (todo/in_progress/done), `category` (work/personal), `ownerId`, `organizationId`.
+- **AuditLog**: `userId`, `action` (create/update/delete), `resourceType`, `resourceId`, `organizationId`, `metadata`, `timestamp`.
 
-```sh
-npx nx show project dashboard
+---
+
+## API Reference
+
+Base URL: `http://localhost:3000/api`
+
+### Auth
+
+| Method | Endpoint      | Auth | Description                    |
+| ------ | ------------- | ---- | ------------------------------ |
+| POST   | `/auth/login` | No   | Login. Body: `{ email, password }` |
+
+**Response:** `{ access_token, user: { id, email, role, organizationId } }`
+
+### Tasks
+
+| Method | Endpoint     | Auth | Roles    | Description        |
+| ------ | ------------ | ---- | -------- | ------------------ |
+| GET    | `/tasks`     | Yes  | Any      | List tasks (org-scoped) |
+| GET    | `/tasks/:id` | Yes  | Any      | Get task by ID     |
+| POST   | `/tasks`     | Yes  | Owner, Admin | Create task    |
+| PUT    | `/tasks/:id` | Yes  | Owner, Admin | Update task    |
+| DELETE | `/tasks/:id` | Yes  | Owner, Admin | Delete task    |
+
+All task endpoints are scoped by the user’s organization(s). Owners at a parent org see tasks for that org and its children.
+
+### Audit Log
+
+| Method | Endpoint       | Auth | Roles      | Description                   |
+| ------ | -------------- | ---- | ---------- | ----------------------------- |
+| GET    | `/audit-log`   | Yes  | Owner, Admin | Paginated audit logs (org-scoped) |
+
+**Query params:** `limit` (default 50, max 100), `offset` (default 0).
+
+### Seed
+
+| Method | Endpoint | Auth | Description              |
+| ------ | -------- | ---- | ------------------------ |
+| POST   | `/seed`  | No   | Clear DB and seed data   |
+
+---
+
+## Access Control
+
+### Roles and hierarchy
+
+- **Owner** – Full access in their org; if at parent org, sees data for parent and child orgs.
+- **Admin** – Same as Owner for create/update/delete of tasks; scoped to their org.
+- **Viewer** – Read-only; scoped to their org.
+
+### Enforcement
+
+1. **JwtAuthGuard** – Validates JWT on protected routes. `@Public()` skips it (e.g. login, seed).
+2. **RolesGuard** – Used with `@Roles(UserRole.OWNER, UserRole.ADMIN)` on write endpoints.
+3. **Organization scoping** – Services use `getAccessibleOrgIds()` to restrict queries to the user’s accessible orgs.
+
+### Frontend
+
+- JWT stored in `localStorage` and sent via `Authorization: Bearer` header.
+- Route guard redirects unauthenticated users to `/login`.
+- Create/Edit/Delete UI hidden for Viewers; API still enforces permissions.
+
+---
+
+## Future Considerations
+
+- **Refresh tokens** – Long-lived refresh token flow for better security and UX.
+- **Tests** – Unit/integration tests for auth, RBAC, and services; e2e for critical flows.
+- **Audit UI** – Dedicated page for audit logs in the dashboard.
+- **Task ordering** – Persisted `sortOrder` for drag-and-drop reordering.
+- **Backend filters** – Pass status/category/sort query params to the API instead of filtering in the frontend.
+- **Database** – Migrate to PostgreSQL for production use.
+
+---
+
+## Useful commands
+
+```bash
+# Build all
+npx nx run-many -t build
+
+# Lint
+npx nx run-many -t lint
+
+# Run tests
+npx nx run-many -t test
 ```
-
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
-
-```sh
-npx nx g @nx/angular:app demo
-```
-
-To generate a new library, use:
-
-```sh
-npx nx g @nx/angular:lib mylib
-```
-
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
-
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
-```
-
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
-
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
-```
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/getting-started/tutorials/angular-monorepo-tutorial?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
